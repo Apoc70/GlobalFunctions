@@ -7,7 +7,7 @@
 
     Author: Thomas Stensitzki
 
-    Version 1.0, 2015-06-10
+    Version 1.1, 2015-07-01
 
     Use the following code to import the module in PowerShell scripts
 
@@ -22,6 +22,7 @@
     Revision History 
     -------------------------------------------------------------------------------- 
     1.0      Initial release
+    1.1      Write to Event log added, send log file added
 #>
 
 <# 
@@ -67,18 +68,29 @@ function Test-Module {
     .Write
     Method to write messages with a given severity level to a log file
 
+    .WriteEventLog
+    Write an event log entry to the local computer event log
+
     .Purge
     Method to purge log files older than log file retentionin days
 
+    .SendLogFile
+    Send the current logger log file as an email attachment
+
     .PARAMETER ScriptRoot
-    The script folder the referencing script is being execting in. 
-    Example: Split-Path $script:MyInvocation.MyCommand.Path
+    The script folder the referencing script is being executing in. 
+    Example: $ScriptDir = Split-Path $script:MyInvocation.MyCommand.Path
+
+    .PARAMETER ScriptName
+    The name of the script referencing the function. This name is used for Windows event log purposes
+    Default = MyScriptName
+    Example: $ScriptName = $MyInvocation.MyCommand.Name
 
     .PARAMETER LogFolder
     Name of the log files folder 
     Default = logs
 
-    .PARAMETER Filename
+    .PARAMETER FileName
     Name pattern for the log file names. This parameter is using utilizing the datetiem format notation
     Default = \LO\G-yyyyMMdd.lo\g
 
@@ -90,10 +102,14 @@ function Test-Module {
     Retention period in days for expired log files
     Default = 30
 
+    .PARAMETER EventLogName
+    Name of the Windows Event Log events are written to.
+    Default = Application
+
     .EXAMPLE
     # Instantiate a new logger object using a log time renttion of 14 days
     $ScriptDir = Split-Path $script:MyInvocation.MyCommand.Path
-    $logger = New-Logger -ScriptRoot $ScriptDir -LogFileRetention 14
+    $logger = New-Logger -ScriptRoot $ScriptDir -ScriptName $ScriptName -LogFileRetention 14
     
     .EXAMPLE
     # Write a new informational message to the log
@@ -108,26 +124,34 @@ function Test-Module {
     $logger.Write("My standard warning", 2)
 
     .EXAMPLE
+    $logger.SendLogFile("sender@mcsmemail.de", "recipient@mcsmemail.de", "smtpserver.mcsmemail.de")
+
+    .EXAMPLE
     # Purge log files
     $logger.Purge()
 
 #>
 function New-Logger {
     param(
+        [Parameter(Mandatory=$true)]
         [string]$ScriptRoot,
+        [string]$ScriptName = "MyScriptName",
         [string]$LogFolder = "logs",
         [string]$FileName = "\LO\G-yyyyMMdd.lo\g",
         [string]$TimeFormat = "yyyy-MM-dd HH:mm",
-        [int]$LogFileRetention = 30
+        [int]$LogFileRetention = 30,
+        [string]$EventLogName = "Application"
     )
     # create logger object
     $logger = New-Object PSCustomObject
     # add logger properties
     $logger | Add-Member -MemberType NoteProperty -Name ScriptRoot -Value $ScriptRoot
+    $logger | Add-Member -MemberType NoteProperty -Name ScriptName -Value $ScriptName
     $logger | Add-Member -MemberType NoteProperty -Name LogFolder -Value $LogFolder
     $logger | Add-Member -MemberType NoteProperty -Name FileName -Value $FileName
     $logger | Add-Member -MemberType NoteProperty -Name TimeFormat -Value $TimeFormat
     $logger | Add-Member -MemberType NoteProperty -Name LogFileRetention -Value $LogFileRetention
+    $logger | Add-Member -MemberType NoteProperty -Name EventLogName -Value $EventLogName
     # add logger script methods
     # WRITE
     # Script method to write log messages to disk
@@ -177,6 +201,31 @@ function New-Logger {
         }
         catch {}
     }
+    # WRITEEVENTLOG
+    # Script method to write messages to event log
+    $logger | Add-Member -MemberType ScriptMethod -Name WriteEventLog {
+        param (
+            [Parameter(Mandatory=$true)]
+            [string]$Message,
+            [int]$Severity = 0 
+        )
+        try {
+            # Create new event log source first. Without event log source we cannot write to event log
+            New-EventLog -LogName $this.EventLogName -Source $this.ScriptName
+
+             # map severity code to string value
+            switch($Severity) {
+                1 { [string]$SeverityString = "Error" }
+                2 { [string]$SeverityString = "Warning" }
+                default { [string]$SeverityString = "Information" } #0
+            }
+
+            Write-EventLog -LogName $this.EventLogName -Source $this.ScriptName -EntryType $SeverityString  -EventId $Severity -Message $Message             
+        }
+        catch {
+            $this.Write("Error writing to event log. Error: $($Error)")           
+        }
+    }
     # PURGE
     # Script method to purge aged log files from disk
     $logger | Add-Member -MemberType ScriptMethod -Name Purge {
@@ -198,11 +247,91 @@ function New-Logger {
         catch {}
 
     }
+    # SENDLOGFILE
+    # Script method to send log file via email
+    $logger | Add-Member -MemberType ScriptMethod -Name SendLogFile {
+        param (
+            [Parameter(Mandatory=$true)]
+            [string]$From,
+            [Parameter(Mandatory=$true)]
+            [string]$To,
+            [Parameter(Mandatory=$true)]
+            [string]$SmtpServer
+        )
+        try {
+            [string]$timeStamp = (Get-Date -Format $this.TimeFormat)
+            [string]$folderPath = Join-Path -Path $this.ScriptRoot -ChildPath $this.LogFolder
+            [string]$file = (Get-Date -Format $this.FileName)
+            [string]$filePath = Join-Path -Path $folderPath -ChildPath $file
+
+            [string]$subject = "Requested Log File ($($this.ScriptName))"
+            [string]$body = "<html>
+                <body>
+                    <font size=""1"" face=""Arial,sans-serif"">
+                    <p2>Please find the requested log file $($filePath) attached to this email.</p>
+                    </font>
+                </body>"
+
+            # Write mail action to log file first
+            $this.Write("Sending log file from $($From) to $($To) via $($SmtpServer)")
+
+            # Send mail message
+            Send-MailMessage -SmtpServer $SmtpServer -From $From -To $To -Subject $subject -Body $body -BodyAsHtml -Attachments $filePath
+        }
+        catch {}
+    }
     # return object
     return $logger
+}
+
+<# 
+    .SYNOPSIS
+    Sends an email to given recipient
+
+    .DESCRIPTION
+    This function is an encapsulation for the Send-MailMessage cmdlet to utilize a common parameter set
+
+    .PARAMETER From
+    Email address of the sender
+
+    .PARAMETER To
+    Email address of the recipient
+
+    .PARAMETER Subject
+    Email subject
+   
+    .PARAMETER MessageBody
+    HTML message body
+
+    .PARAMETER SMTPServer
+    SMTP Server for relaying the message
+
+    .EXAMPLE
+    # Send an email
+    Send-Mail -From sender@mcsmemail.de -To recipient@mcsmemail.de -Subject "My message subject" -MessageBody $SomeBodyVariable -SMTPServer myserver.mcsmemail.de
+#>
+function Send-Mail {
+    param (
+        [Parameter(Mandatory=$true)]
+        [string]$From,
+        [Parameter(Mandatory=$true)]
+        [string]$To,
+        [Parameter(Mandatory=$true)]
+        [string]$Subject,
+        [Parameter(Mandatory=$true)]
+        [string]$MessageBody,
+        [Parameter(Mandatory=$true)]
+        [string]$SMTPServer
+    )
+    try {
+        Send-MailMessage -From $From -To $To -SmtpServer $SMTPServer -BodyAsHtml $MessageBody -Subject $Subject 
+    }
+    catch {}
 }
 
 # Exported functions
 # --------------------------------------------------
 Export-ModuleMember -Function Test-Module
+Export-ModuleMember -Function Write-Log
 Export-ModuleMember -Function New-Logger
+Export-ModuleMember -Function Send-Mail
