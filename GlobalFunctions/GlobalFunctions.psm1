@@ -6,8 +6,8 @@
     This module contains all functions used by PowerShell scripts authored by the Exchange Team
 
     Author: Thomas Stensitzki
-
-    Version 1.1, 2015-07-01
+    
+    Version 1.2, 2015-07-17
 
     Use the following code to import the module in PowerShell scripts
 
@@ -23,6 +23,7 @@
     -------------------------------------------------------------------------------- 
     1.0      Initial release
     1.1      Write to Event log added, send log file added
+    1.2      CopyFile added
 #>
 
 <# 
@@ -246,6 +247,36 @@ function New-Logger {
         }
         catch {}
 
+    }
+    # COPYFILE
+    # Script method to copy a file to sub folder
+    $logger | Add-Member -MemberType ScriptMethod -Name CopyFile {
+        param (
+            [Parameter(Mandatory=$true)]
+            [string]$SourceFilePath,
+            [Parameter(Mandatory=$true)]
+            [string]$RepositoryFolderName
+        )
+        try {
+            [string]$folderPath = Join-Path -Path $this.ScriptRoot -ChildPath $RepositoryFolderName
+            [string]$sourceFileName = Split-Path -Path $SourceFilePath -Leaf
+
+            # check if repository directory exists
+            if(!(Test-Path -Path $folderPath)) {
+                # create log directory
+                New-Item -Path $folderPath -ItemType Directory | Out-Null
+                $this.Write("$($folderPath) folder created")
+            }            
+
+            if(Test-Path -Path $SourceFilePath) {
+                $this.Write("Moving $($SourceFilePath) to $(Join-Path -Path $folderPath -ChildPath $sourceFileName)")
+                Move-Item -Path $SourceFilePath -Destination (Join-Path -Path $folderPath -ChildPath $sourceFileName)
+            }
+            else {
+                $this.Write("$($folderPath) does not exist and cannot be copied",2)
+            }
+        }
+        catch {}
     }
     # SENDLOGFILE
     # Script method to send log file via email
