@@ -1,9 +1,9 @@
 <#
     .Synopsis
-    PowerShell module for all global functions
+    PowerShell module providing centralizied logging and other helpful functions
 
     .Description
-    This module contains all functions used by PowerShell scripts authored by the Exchange Team
+    This module provides centralized file logging capabilities and other helpful stuff
 
     Author: Thomas Stensitzki
     
@@ -24,6 +24,7 @@
     1.0      Initial release
     1.1      Write to Event log added, send log file added
     1.2      CopyFile added
+    1.3      Updated for PowerShellGallery
 #>
 
 <# 
@@ -45,7 +46,7 @@ function Test-Module {
         [switch]$Test
     )
     if($Test) {
-        Write-Host "Module Test"
+        Write-Host 'Module Test'
     }
 }
 
@@ -136,12 +137,12 @@ function New-Logger {
     param(
         [Parameter(Mandatory=$true)]
         [string]$ScriptRoot,
-        [string]$ScriptName = "MyScriptName",
-        [string]$LogFolder = "logs",
-        [string]$FileName = "\LO\G-yyyyMMdd.lo\g",
-        [string]$TimeFormat = "yyyy-MM-dd HH:mm",
+        [string]$ScriptName = 'MyScriptName',
+        [string]$LogFolder = 'logs',
+        [string]$FileName = '\LO\G-yyyyMMdd.lo\g',
+        [string]$TimeFormat = 'yyyy-MM-dd HH:mm',
         [int]$LogFileRetention = 30,
-        [string]$EventLogName = "Application"
+        [string]$EventLogName = 'Application'
     )
     # create logger object
     $logger = New-Object PSCustomObject
@@ -172,9 +173,9 @@ function New-Logger {
 
             # map severity code to string value
             switch($Severity) {
-                1 { [string]$SeverityString = "Error" }
-                2 { [string]$SeverityString = "Warning" }
-                default { [string]$SeverityString = "Info" } #0
+                1 { [string]$SeverityString = 'Error' }
+                2 { [string]$SeverityString = 'Warning' }
+                default { [string]$SeverityString = 'Info' } #0
             }
 
             # check if log directory exists
@@ -193,7 +194,7 @@ function New-Logger {
             if(!(Test-Path -Path $filePath)) {
                 $line = "$($prefix) LOG FILE CREATED ##############################`r`n"
                 New-Item -Path $filePath -ItemType File -Value $line -Force | Out-Null
-                $line ="TIMESTAMP       : PROCESS ID - SEVERITY - MESSAGE"
+                $line ='TIMESTAMP       : PROCESS ID - SEVERITY - MESSAGE'
                 Add-Content -Path $filePath -Value $line
             }
             # write message to file
@@ -216,9 +217,9 @@ function New-Logger {
 
              # map severity code to string value
             switch($Severity) {
-                1 { [string]$SeverityString = "Error" }
-                2 { [string]$SeverityString = "Warning" }
-                default { [string]$SeverityString = "Information" } #0
+                1 { [string]$SeverityString = 'Error' }
+                2 { [string]$SeverityString = 'Warning' }
+                default { [string]$SeverityString = 'Information' } #0
             }
 
             Write-EventLog -LogName $this.EventLogName -Source $this.ScriptName -EntryType $SeverityString  -EventId $Severity -Message $Message             
@@ -237,7 +238,7 @@ function New-Logger {
         [string]$folderPath = Join-Path -Path $this.ScriptRoot -ChildPath $this.LogFolder
         try {
             # fetch list of log files
-            $logFiles = Get-ChildItem -Path $folderPath | ?{$_.LastWriteTimeUtc.Date -le ([datetime]::UtcNow.AddDays(-($this.LogFileRetention))).Date}
+            $logFiles = Get-ChildItem -Path $folderPath | Where-Object{$_.LastWriteTimeUtc.Date -le ([datetime]::UtcNow.AddDays(-($this.LogFileRetention))).Date}
             # write summary to log file
             $this.Write("Deleting $($logFiles.Count) log files older than $($this.LogFileRetention) days")
 
