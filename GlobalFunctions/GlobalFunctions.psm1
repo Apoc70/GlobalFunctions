@@ -7,14 +7,17 @@
 
     Author: Thomas Stensitzki
     
-    Version 1.2, 2015-07-17
+    Version 1.3.1, 2017-01-06
 
     Use the following code to import the module in PowerShell scripts
 
         Import-Module GlobalFunctions
 
     Make sure that the file path to the PowerShell module has been added to the persistent list of PowerShell module paths using the Set-PersistentPSModulePath.ps1 script.
-
+    
+    .LINK  
+    More information can be found at http://scripts.granikos.eu
+    
     .NOTES 
     Requirements 
     - Windows Server 2008 R2 SP1, Windows Server 2012 or Windows Server 2012 R2
@@ -25,6 +28,7 @@
     1.1      Write to Event log added, send log file added
     1.2      CopyFile added
     1.3      Updated for PowerShellGallery
+    1.3.1    Link added
 #>
 
 <# 

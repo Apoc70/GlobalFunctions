@@ -4,3 +4,5 @@ PowerShell module containing all required global functions for other PowerShell 
 Use the Set-PersistentPSModulePath.ps1 script to add the folder containing the GlobalFunctions folder to the list of PSModulePath system variable. 
 
 Find it at TechNet: https://gallery.technet.microsoft.com/Centralized-logging-64e20f97
+
+Find the blog post here: https://www.granikos.eu/en/justcantgetenough/PostId/210/globalfunctions-shared-powershell-library
