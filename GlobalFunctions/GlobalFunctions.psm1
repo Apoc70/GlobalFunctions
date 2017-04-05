@@ -1,13 +1,14 @@
-<#
+﻿<#
     .Synopsis
     PowerShell module providing centralizied logging and other helpful functions
 
     .Description
+
     This module provides centralized file logging capabilities and other helpful stuff
 
     Author: Thomas Stensitzki
     
-    Version 1.3.1, 2017-01-06
+    Version 2.0, 2017-04-05
 
     Use the following code to import the module in PowerShell scripts
 
@@ -17,7 +18,7 @@
     
     .LINK  
     More information can be found at http://scripts.granikos.eu
-    
+   
     .NOTES 
     Requirements 
     - Windows Server 2008 R2 SP1, Windows Server 2012 or Windows Server 2012 R2
@@ -29,6 +30,7 @@
     1.2      CopyFile added
     1.3      Updated for PowerShellGallery
     1.3.1    Link added
+    2.0      Converted to UNICODE, Functions added: Replace-SpecialCharactersUpperCase,New-RandomPassword
 #>
 
 <# 
@@ -139,7 +141,7 @@ function Test-Module {
 #>
 function New-Logger {
     param(
-        [Parameter(Mandatory=$true)]
+        [Parameter(Mandatory,HelpMessage='Absolute path to script folder')]
         [string]$ScriptRoot,
         [string]$ScriptName = 'MyScriptName',
         [string]$LogFolder = 'logs',
@@ -161,9 +163,9 @@ function New-Logger {
     # add logger script methods
     # WRITE
     # Script method to write log messages to disk
-    $logger | Add-Member -MemberType ScriptMethod -Name Write {
+    $logger | Add-Member -MemberType ScriptMethod -Name Write -Value {
         param (
-            [Parameter(Mandatory=$true)]
+            [Parameter(Mandatory,HelpMessage='A log message is required')]
             [string]$Message,
             [int]$Severity = 0
         )
@@ -185,7 +187,7 @@ function New-Logger {
             # check if log directory exists
             if(!(Test-Path -Path $folderPath)) {
                 # create log directory
-                New-Item -Path $folderPath -ItemType Directory | Out-Null
+                $null = New-Item -Path $folderPath -ItemType Directory
             }
 
             # define log line columns
@@ -197,7 +199,7 @@ function New-Logger {
             # check, if file exists
             if(!(Test-Path -Path $filePath)) {
                 $line = "$($prefix) LOG FILE CREATED ##############################`r`n"
-                New-Item -Path $filePath -ItemType File -Value $line -Force | Out-Null
+                $null = New-Item -Path $filePath -ItemType File -Value $line -Force
                 $line ='TIMESTAMP       : PROCESS ID - SEVERITY - MESSAGE'
                 Add-Content -Path $filePath -Value $line
             }
@@ -209,9 +211,9 @@ function New-Logger {
     }
     # WRITEEVENTLOG
     # Script method to write messages to event log
-    $logger | Add-Member -MemberType ScriptMethod -Name WriteEventLog {
+    $logger | Add-Member -MemberType ScriptMethod -Name WriteEventLog -Value {
         param (
-            [Parameter(Mandatory=$true)]
+            [Parameter(Mandatory,HelpMessage='A log message is required')]
             [string]$Message,
             [int]$Severity = 0 
         )
@@ -221,7 +223,7 @@ function New-Logger {
 
              # map severity code to string value
             switch($Severity) {
-                1 { [string]$SeverityString = 'Error' }
+				1 { [string]$SeverityString = 'Error' }
                 2 { [string]$SeverityString = 'Warning' }
                 default { [string]$SeverityString = 'Information' } #0
             }
@@ -234,7 +236,8 @@ function New-Logger {
     }
     # PURGE
     # Script method to purge aged log files from disk
-    $logger | Add-Member -MemberType ScriptMethod -Name Purge {
+    $logger | Add-Member -MemberType ScriptMethod -Name Purge -Value {
+        [CmdletBinding()]
         param (
             [switch]$Detailed
         )
@@ -255,11 +258,11 @@ function New-Logger {
     }
     # COPYFILE
     # Script method to copy a file to sub folder
-    $logger | Add-Member -MemberType ScriptMethod -Name CopyFile {
+    $logger | Add-Member -MemberType ScriptMethod -Name CopyFile -Value {
         param (
-            [Parameter(Mandatory=$true)]
+            [Parameter(Mandatory,HelpMessage='Source file path is required')]
             [string]$SourceFilePath,
-            [Parameter(Mandatory=$true)]
+            [Parameter(Mandatory,HelpMessage='Target file path is required')]
             [string]$RepositoryFolderName
         )
         try {
@@ -269,7 +272,7 @@ function New-Logger {
             # check if repository directory exists
             if(!(Test-Path -Path $folderPath)) {
                 # create log directory
-                New-Item -Path $folderPath -ItemType Directory | Out-Null
+                $null = New-Item -Path $folderPath -ItemType Directory
                 $this.Write("$($folderPath) folder created")
             }            
 
@@ -285,13 +288,13 @@ function New-Logger {
     }
     # SENDLOGFILE
     # Script method to send log file via email
-    $logger | Add-Member -MemberType ScriptMethod -Name SendLogFile {
+    $logger | Add-Member -MemberType ScriptMethod -Name SendLogFile -Value {
         param (
-            [Parameter(Mandatory=$true)]
+            [Parameter(Mandatory,HelpMessage='Sender address is required')]
             [string]$From,
-            [Parameter(Mandatory=$true)]
+            [Parameter(Mandatory,HelpMessage='Recipient address is required')]
             [string]$To,
-            [Parameter(Mandatory=$true)]
+            [Parameter(Mandatory,HelpMessage='Smtp server address is required')]
             [string]$SmtpServer
         )
         try {
@@ -348,22 +351,223 @@ function New-Logger {
 #>
 function Send-Mail {
     param (
-        [Parameter(Mandatory=$true)]
+        [Parameter(Mandatory,HelpMessage='Sender address is required')]
         [string]$From,
-        [Parameter(Mandatory=$true)]
+        [Parameter(Mandatory,HelpMessage='Recipient address is required')]
         [string]$To,
-        [Parameter(Mandatory=$true)]
+        [Parameter(Mandatory,HelpMessage='Message subject is required')]
         [string]$Subject,
-        [Parameter(Mandatory=$true)]
+        [Parameter(Mandatory,HelpMessage='Message body is required')]
         [string]$MessageBody,
-        [Parameter(Mandatory=$true)]
+        [Parameter(Mandatory,HelpMessage='Smtp server is required')]
         [string]$SMTPServer
     )
     try {
-        Send-MailMessage -From $From -To $To -SmtpServer $SMTPServer -BodyAsHtml $MessageBody -Subject $Subject 
+        # 2015-09-24 TST, Changed to .NET Object
+        Send-MailMessage -From $From -To $To -SmtpServer $SMTPServer -BodyAsHtml $MessageBody -Subject $Subject -ErrorAction SilentlyContinue
+        <#
+  	    $smtpMail =New-Object Net.Mail.SmtpClient($SMTPServer) 
+        $smtpMessage = New-Object System.Net.Mail.MailMessage $From, $To
+        $smtpMessage.Subject = $Subject
+        $smtpMessage.Body = $MessageBody
+        $smtpMessage.IsBodyHtml = $true
+
+        $smtpMail.Send($smtpMessage)
+        #>
+
     }
-    catch {}
+    catch {	}
 }
+
+# Active Directory functions 
+#
+
+<#
+  .SYNOPSIS
+  Replace special characters and convert to UPPER CASE
+
+  .DESCRIPTION
+  The function converst the inout string to upper case and replaces matching special characters to default ANSI characters.
+
+  Primarily used to during a samAccountNames normalization process
+
+  .PARAMETER Value
+  A string to convert
+
+  .EXAMPLE
+  Replace-SpecialCharactersUpperCase -Value "Ängström"
+    
+  Converts the Value string to AENGSTROEM
+#>
+function Format-SpecialCharactersUpperCase {
+[CmdletBinding()]
+[OutputType([String])] 
+param (
+  [string]$Value
+) 
+  # Convert to upper first
+  $var = $Value.ToUpper()
+  $var = $var -replace 'Ä','A'
+  $var = $var -replace 'Ö','O'
+  $var = $var -replace 'Ü','U'
+  $var = $var -replace '¡','i'
+  $var = $var -replace 'À|Á|Â|Ã|Å|Ǎ|Ą|Ă','A'
+  $var = $var -replace 'Æ','AE'
+  $var = $var -replace 'Ç|Ć|Ĉ|Č','C'
+  $var = $var -replace 'Ď|Đ|ð','D'
+  $var = $var -replace 'È|É|Ê|Ë|Ě|Ę','E'
+  $var = $var -replace 'Ĝ|Ģ|Ğ','G'
+  $var = $var -replace 'Ĥ','H'
+  $var = $var -replace 'Ì|Í|Î|Ï|ı','I'
+  $var = $var -replace 'Ĵ','J'
+  $var = $var -replace 'Ķ','K'
+  $var = $var -replace 'Ĺ|Ļ|Ł|Ľ','L'
+  $var = $var -replace 'Ñ|Ń|Ň','N'
+  $var = $var -replace 'Ò|Ó|Ô|Õ|Ő','O'
+  $var = $var -replace 'Ø|Œ','OE'
+  $var = $var -replace 'Ŕ|Ř','R'
+  $var = $var -replace 'ẞ|ß|Ś|Ŝ|Ş|Š','S'
+  $var = $var -replace 'Ť|Ţ|Þ','T'
+  $var = $var -replace 'Ù|Ú|Û|Ű|Ũ|Ų|Ů','U'
+  $var = $var -replace 'Ŵ','W'
+  $var = $var -replace 'Ý|Ÿ|Ŷ','Y'
+  $var = $var -replace 'Ź|Ž|Ż','Z'
+  [char[]]$specialChars = '¿!@#$%^&*(){}[]":;,.<>/|\-+=`~ '''
+  $regEx = ($specialChars | ForEach-Object {[regex]::Escape($_)}) -join '|'
+  $var = $var -replace $regEx,''
+
+  return $var
+}
+
+
+<#
+  .SYNOPSIS
+  Create a random password
+
+  .DESCRIPTION
+  The function creates a random password using a given set of available characters.
+  The password is generated with fixed or random length.
+
+  .PARAMETER MinPasswordLength
+  Minimum password length when generating a random length password
+
+  .PARAMETER MaxPasswordLength
+  Maximum password length when generating a random length password
+
+  .PARAMETER PasswordLength
+  Fixed password length
+
+  .PARAMETER InputStrings
+  String array containing sets of available password characters
+
+  .PARAMETER FirstChar
+  Specifies a string containing a character group from which the first character in the password will be generated
+
+  .PARAMETER Count
+  Number of passwords to generate, default = 1
+
+  .EXAMPLE
+  New-RandomPassword -MinPasswordLength 6 -MaxPasswordLength 12
+  Generates a random password fo minimum length 6 andmaximum length 12 characters
+
+  .EXAMPLE
+  New-RandomPassword -PasswordLength 20
+  Generates a password of 20 characters
+
+  .EXAMPLE
+  New-RandomPassword -InputStrings Value -FirstChar Value -Count Value
+  Describe what this call does
+
+  .NOTES
+  Based on Simon Wahlin's script published here: https://gallery.technet.microsoft.com/scriptcenter/Generate-a-random-and-5c879ed5
+#>
+function New-RandomPassword {
+[CmdletBinding(DefaultParameterSetName='FixedLength')]
+[OutputType([String])] 
+param(
+  [Parameter(ParameterSetName='RandomLength')]
+  [ValidateScript({$_ -gt 0})]
+  [Alias('Min')] 
+  [int]$MinPasswordLength = 8,
+        
+  [Parameter(ParameterSetName='RandomLength')]
+  [ValidateScript({
+          if($_ -ge $MinPasswordLength){$true}
+          else{Throw 'Max value cannot be lesser than min value.'}})]
+  [Alias('Max')]
+  [int]$MaxPasswordLength = 12,
+
+  [Parameter(ParameterSetName='FixedLength')]
+  [ValidateRange(1,2147483647)]
+  [int]$PasswordLength = 8,
+        
+  [String[]]$InputStrings = @('abcdefghjkmnpqrstuvwxyz', 'ABCEFGHJKLMNPQRSTUVWXYZ', '23456789', '=+_?!"*@#%&'),
+
+  [String] $FirstChar,
+        
+  # Specifies number of passwords to generate.
+  [ValidateRange(1,2147483647)]
+  [int]$Count = 1
+)
+
+  Function Get-Seed{
+            # Generate a seed for randomization
+            $RandomBytes = New-Object -TypeName 'System.Byte[]' 4
+            $Random = New-Object -TypeName 'System.Security.Cryptography.RNGCryptoServiceProvider'
+            $Random.GetBytes($RandomBytes)
+            [BitConverter]::ToUInt32($RandomBytes, 0)
+        }
+
+  For($iteration = 1;$iteration -le $Count; $iteration++){
+    $Password = @{}
+    # Create char arrays containing groups of possible chars
+    [char[][]]$CharGroups = $InputStrings
+
+    # Create char array containing all chars
+    $AllChars = $CharGroups | ForEach-Object {[Char[]]$_}
+
+    # Set password length
+    if($PSCmdlet.ParameterSetName -eq 'RandomLength')
+    {
+        if($MinPasswordLength -eq $MaxPasswordLength) {
+            # If password length is set, use set length
+            $PasswordLength = $MinPasswordLength
+        }
+        else {
+            # Otherwise randomize password length
+            $PasswordLength = ((Get-Seed) % ($MaxPasswordLength + 1 - $MinPasswordLength)) + $MinPasswordLength
+        }
+    }
+
+    # If FirstChar is defined, randomize first char in password from that string.
+    if($PSBoundParameters.ContainsKey('FirstChar')){
+        $Password.Add(0,$FirstChar[((Get-Seed) % $FirstChar.Length)])
+    }
+    # Randomize one char from each group
+    Foreach($Group in $CharGroups) {
+        if($Password.Count -lt $PasswordLength) {
+            $Index = Get-Seed
+            While ($Password.ContainsKey($Index)){
+                $Index = Get-Seed                        
+            }
+            $Password.Add($Index,$Group[((Get-Seed) % $Group.Count)])
+        }
+    }
+
+    # Fill out with chars from $AllChars
+    for($i=$Password.Count;$i -lt $PasswordLength;$i++) {
+        $Index = Get-Seed
+        While ($Password.ContainsKey($Index)){
+            $Index = Get-Seed                        
+        }
+        $Password.Add($Index,$AllChars[((Get-Seed) % $AllChars.Count)])
+    }
+  }
+
+  return $(-join ($Password.GetEnumerator() | Sort-Object -Property Name | Select-Object -ExpandProperty Value))
+
+}
+
 
 # Exported functions
 # --------------------------------------------------
@@ -371,3 +575,5 @@ Export-ModuleMember -Function Test-Module
 Export-ModuleMember -Function Write-Log
 Export-ModuleMember -Function New-Logger
 Export-ModuleMember -Function Send-Mail
+Export-ModuleMember -Function Format-SpecialCharactersUpperCase
+Export-ModuleMember -Function New-RandomPassword
