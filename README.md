@@ -1,8 +1,8 @@
 # GlobalFunctions
+
 PowerShell module containing required global functions for other PowerShell scripts.
 
 ## Available Functions
-
 
 - Test-Module
 - Write-Log
