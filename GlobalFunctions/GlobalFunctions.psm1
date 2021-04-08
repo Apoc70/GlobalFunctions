@@ -163,6 +163,7 @@ function New-Logger {
   $logger | Add-Member -MemberType NoteProperty -Name TimeFormat -Value $TimeFormat
   $logger | Add-Member -MemberType NoteProperty -Name LogFileRetention -Value $LogFileRetention
   $logger | Add-Member -MemberType NoteProperty -Name EventLogName -Value $EventLogName
+  
   # add logger script methods
   # WRITE
   # Script method to write log messages to disk
